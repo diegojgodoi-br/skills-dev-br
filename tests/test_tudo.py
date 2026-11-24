@@ -7,7 +7,8 @@ from datetime import date, timedelta
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
-for s in ("validar-documentos-br", "pix-copia-e-cola", "boleto-linha-digitavel", "nfe-xml", "lgpd-revisao-sistema"):
+for s in ("validar-documentos-br", "pix-copia-e-cola", "boleto-linha-digitavel", "nfe-xml", "lgpd-revisao-sistema",
+          "reforma-tributaria-ibs-cbs", "nfse-nacional"):
     sys.path.insert(0, str(RAIZ / "skills" / s / "scripts"))
 
 import documentos_br as doc  # noqa: E402
@@ -15,6 +16,8 @@ import pix_brcode as pix  # noqa: E402
 import boleto  # noqa: E402
 import nfe  # noqa: E402
 import mapear_dados_pessoais as lgpd  # noqa: E402
+import reforma  # noqa: E402
+import nfse  # noqa: E402
 
 
 def test_cnpj_exemplo_oficial():
@@ -161,6 +164,83 @@ def test_lgpd_varredura_e_mascara():
     assert not any("node_modules" in a[2] for a in achados)
     for vazamento in ("529.982.247-25", "joao.silva", "empresareal", "99876-5432"):
         assert vazamento not in md
+
+
+def test_reforma_2026_teste():
+    r = reforma.simular("1000", 2026)
+    assert (r["cbs"], r["ibs"], r["total_com_tributo"]) == ("9.00", "1.00", "1010.00")
+    assert r["pis_cofins_vigente"] is True
+
+
+def test_reforma_nao_inventa_aliquota():
+    for ano in (2027, 2029, 2033):
+        try:
+            reforma.simular("1000", ano)
+        except ValueError as e:
+            assert "Senado" in str(e)
+        else:
+            raise AssertionError(f"{ano} deveria exigir a alíquota de referência")
+    assert reforma.simular("1000", 2027, cbs="8.8")["ibs"] == "1.00"   # IBS 2027 = 0,05% + 0,05%
+
+
+def test_reforma_reducoes_e_calendario():
+    assert reforma.simular("1000", 2026, reducao=60)["cbs"] == "3.60"
+    assert reforma.simular("1000", 2026, reducao=100)["total_ibs_cbs"] == "0.00"
+    assert reforma.simular("200", 2027, cbs="10", ibs="0.1", reducao=30)["cbs"] == "14.00"
+    fatores = [str(reforma.CALENDARIO[a]["icms_iss"]) for a in range(2028, 2034)]
+    assert fatores == ["1", "0.9", "0.8", "0.7", "0.6", "0"]
+    assert not reforma.CALENDARIO[2027]["pis_cofins"]
+
+
+def test_reforma_por_dentro_e_apuracao():
+    r = reforma.por_dentro("1100", cbs="9", ibs="1")
+    assert (r["base"], r["tributos"], r["aliq_efetiva_total"]) == ("1000.00", "100.00", "10")
+    a = reforma.apurar("100000", "40000", cbs="9", ibs="1")
+    assert a["cbs"]["saldo"] == "5400.00" and a["ibs"]["saldo"] == "600.00"
+    assert reforma.apurar("100", "300", cbs="9", ibs="1")["cbs"]["situacao"] == "saldo credor"
+
+
+CHAVE_NFSE = "41130022212345678000195000000000012326111234567891"
+
+
+def test_nfse_chave_e_dps():
+    c = nfse.decompor_chave("NFS" + CHAVE_NFSE)
+    assert c["formato_ok"] and c["cod_municipio_ibge"] == "4113002"
+    assert (c["tipo_inscricao"], c["inscricao_emitente"], c["numero_nfse"], c["emissao_aaaa_mm"]) == \
+        ("CNPJ", "12345678000195", "123", "2026-11")
+    assert c["dv_conferido"] is False                      # regra do DV não é pública
+    cpf = nfse.decompor_chave(CHAVE_NFSE[:8] + "1" + "00052998224725" + CHAVE_NFSE[23:])
+    assert cpf["tipo_inscricao"] == "CPF" and cpf["inscricao_emitente"] == "52998224725"
+    assert not nfse.decompor_chave(CHAVE_NFSE[:-1])["formato_ok"]
+    assert not nfse.decompor_chave(CHAVE_NFSE[:36] + "2613" + CHAVE_NFSE[40:])["formato_ok"]   # mês 13
+    d = nfse.decompor_dps("DPS411300221234567800019500001000000000000123")
+    assert d["formato_ok"] and (d["serie"], d["numero_dps"]) == ("1", "123")
+
+
+def test_nfse_ler_xml_e_lote():
+    xml = RAIZ / "tests" / "fixtures" / "nfse_exemplo.xml"
+    n = nfse.ler_xml(xml)
+    assert n["chave"] == CHAVE_NFSE and n["numero_nfse"] == "123"
+    assert (n["prestador_doc"], n["tomador_doc"]) == ("12345678000195", "98765432000198")
+    assert (n["valor_servico"], n["valor_iss"], n["valor_liquido"]) == ("1000.00", "20.00", "980.00")
+    assert n["iss_retencao"] == "retido pelo tomador"
+    assert n["tem_grupo_ibscbs"] and (n["ibscbs_cst"], n["ibscbs_cclasstrib"]) == ("000", "000001")
+    with tempfile.TemporaryDirectory() as d:
+        texto = xml.read_text(encoding="utf-8")
+        Path(d, "a.xml").write_text(texto, encoding="utf-8")
+        Path(d, "copia.xml").write_text(texto, encoding="utf-8")
+        sem_ns = texto.replace(' xmlns="http://www.sped.fazenda.gov.br/nfse"', "")
+        inicio = sem_ns.index("<DPS ")
+        Path(d, "so_dps.xml").write_text(sem_ns[inicio:sem_ns.index("</DPS>") + 6], encoding="utf-8")
+        Path(d, "lixo.xml").write_text("<nada/>", encoding="utf-8")
+        notas, erros = nfse.ler([d])
+        assert len(notas) == 3 and len(erros) == 1
+        assert any("duplicada" in x["alertas"] for x in notas)
+        dps = [x for x in notas if x["tipo"].startswith("DPS")][0]
+        assert "não prova" in dps["alertas"] and dps["tomador_doc"] == "98765432000198"
+        csv_ = nfse.salvar_csv(notas, str(Path(d, "rel")))
+        conteudo = csv_.read_text(encoding="utf-8-sig")
+        assert "1000,00" in conteudo and conteudo.count("\n") == 4
 
 
 if __name__ == "__main__":
