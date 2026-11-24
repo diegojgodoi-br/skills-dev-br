@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- NFS-e fictícia para testes: CNPJs e nomes inventados -->
+<NFSe xmlns="http://www.sped.fazenda.gov.br/nfse" versao="1.01">
+  <infNFSe Id="NFS41130022212345678000195000000000012326111234567891">
+    <xLocEmi>Londrina</xLocEmi>
+    <nNFSe>123</nNFSe>
+    <xLocIncid>Londrina</xLocIncid>
+    <ambGer>2</ambGer>
+    <cStat>100</cStat>
+    <dhProc>2026-11-10T10:15:00-03:00</dhProc>
+    <emit><CNPJ>12345678000195</CNPJ><xNome>Empresa Exemplo de TI Ltda</xNome></emit>
+    <valores><vBC>1000.00</vBC><pAliqAplic>2.00</pAliqAplic><vISSQN>20.00</vISSQN><vLiq>980.00</vLiq></valores>
+    <DPS versao="1.01">
+      <infDPS Id="DPS411300221234567800019500001000000000000123">
+        <tpAmb>2</tpAmb><serie>1</serie><nDPS>123</nDPS><dCompet>2026-11-10</dCompet><cLocEmi>4113002</cLocEmi>
+        <prest><CNPJ>12345678000195</CNPJ><regTrib><opSimpNac>1</opSimpNac></regTrib></prest>
+        <toma><CNPJ>98765432000198</CNPJ><xNome>Cliente Exemplo S.A.</xNome></toma>
+        <serv><cServ><cTribNac>010101</cTribNac><xDescServ>Suporte técnico em informática</xDescServ><cNBS>115013000</cNBS></cServ></serv>
+        <valores><vServPrest><vServ>1000.00</vServ></vServPrest>
+          <trib><tribMun><tribISSQN>1</tribISSQN><tpRetISSQN>2</tpRetISSQN></tribMun></trib></valores>
+        <IBSCBS><finNFSe>0</finNFSe><indFinal>0</indFinal><cIndOp>030102</cIndOp>
+          <valores><trib><gIBSCBS><CST>000</CST><cClassTrib>000001</cClassTrib></gIBSCBS></trib></valores></IBSCBS>
+      </infDPS>
+    </DPS>
+  </infNFSe>
+</NFSe>
