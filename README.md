@@ -14,6 +14,8 @@ Cada skill vem com **código de referência testado** (Python, e também PHP e J
 
 [**Skills**](#-as-skills) · [**Instalar**](#-instalação) · [**Exemplos**](#-exemplos-de-pedido) · [**Como foi testado**](#-como-foi-testado) · [**Skills em português para outras profissões**](https://github.com/diegojgodoi-br/skills-ia-pt-br)
 
+📚 **Cursos grátis de IA com certificado, 87 skills explicadas e guias em português:** [iacomousar.com.br](https://iacomousar.com.br/?utm_source=github&utm_medium=readme&utm_campaign=skills-dev-br)
+
 </div>
 
 ---
